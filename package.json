@@ -4,17 +4,16 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "turbo run lint",
     "check-types": "turbo run check-types",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "lint": "biome check",
+    "format": "biome check --write"
   },
   "devDependencies": {
-    "pnpm": "12.6.0",
-    "prettier": "3.9.9",
-    "prettier-plugin-tailwindcss": "0.8.1",
+    "@biomejs/biome": "2.5.15",
+    "pnpm": "12.11.2",
     "turbo": "^2.11.7"
   },
-  "packageManager": "pnpm@12.6.0",
+  "packageManager": "pnpm@12.11.2",
   "engines": {
     "node": ">=24"
   }
