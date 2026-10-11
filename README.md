@@ -1,52 +1,56 @@
-# Turborepo Tailwind CSS starter
+# Vote Visualizer
 
-This Turborepo starter is maintained by the Turborepo core team.
+Visualizes how representatives and political parties vote in the Norwegian Storting, using [Stortinget's open data API](https://data.stortinget.no/).
 
-## Using this example
+- **`services/rust`**: Rust service (Axum, SQLx) that imports votes from Stortinget, validates them, stores them in PostgreSQL, and serves them through a read API.
+- **`apps/web`**: Next.js frontend that reads from that API.
+- **PostgreSQL** holds the imported data. Imports are idempotent and each vote is saved in a single transaction, so a failed import never leaves partial data.
 
-Run the following command:
+Currently one vote can be imported at a time through a local dev endpoint. Automated tests, request pacing, and the frontend integration are still to come. See [docs/architecture-design.md](docs/architecture-design.md) for the design and implementation status.
+
+## Getting started
+
+Prerequisites: [mise](https://mise.jdx.dev/) (installs Node, pnpm, and Just from `mise.toml`), [rustup](https://rustup.rs/) (picks up the toolchain from `rust-toolchain.toml`), and Docker.
 
 ```sh
-npx create-turbo@latest -e with-tailwind
+mise install
+just install    # JS and Cargo dependencies, plus the pinned sqlx-cli
+just migrate    # start PostgreSQL and apply migrations
+just dev        # run the Rust API and the web app
 ```
 
-## What's inside?
+| What | Where |
+| --- | --- |
+| Rust API | http://127.0.0.1:8080 |
+| Web app | http://localhost:3001 |
+| PostgreSQL | `localhost:5433`, connection string in `.env` |
 
-This Turborepo includes the following packages/apps:
+Import the example vote and read it back:
 
-### Apps and Packages
+```sh
+curl -H 'Content-Type: application/json' \
+  -d '{"case_id":83657,"vote_id":16897}' \
+  http://127.0.0.1:8080/dev/imports/vote
 
-- `web`: a [Next.js](https://nextjs.org/) app with [Tailwind CSS](https://tailwindcss.com/)
-- `ui`: a stub React component library with [Tailwind CSS](https://tailwindcss.com/) shared by apps
-- `@repo/tailwind-config`: shared Tailwind CSS theme and PostCSS configuration
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Building packages/ui
-
-This example is set up to produce compiled styles for `ui` components into the `dist` directory. The component `.tsx` files are consumed by the Next.js apps directly using `transpilePackages` in `next.config.ts`. This was chosen for several reasons:
-
-- Make sharing one theme from `packages/tailwind-config/shared-styles.css` to apps and packages as easy as possible.
-- Make package compilation simple by only depending on the Next.js Compiler and `tailwindcss`.
-- Ensure Tailwind classes do not overwrite each other. The `ui` package uses a `ui-` prefix for its classes via `@import "tailwindcss" prefix(ui);` in [packages/ui/src/styles.css](packages/ui/src/styles.css).
-- Maintain clear package export boundaries.
-
-Another option is to consume `packages/ui` directly from source without building. Tailwind CSS v4 automatically detects class names in your source files, but it does not scan other packages in `node_modules`. If you use this option, add [`@source` directives](https://tailwindcss.com/docs/functions-and-directives#source-directive) to the CSS entry point in your apps so Tailwind can find the class names used in the `ui` package:
-
-```css
-@import "tailwindcss";
-@import "@repo/tailwind-config";
-
-@source "../../../packages/ui/src";
+curl http://127.0.0.1:8080/votes/16897
 ```
 
-If you choose this strategy, you can remove the `tailwindcss` dependency and the `build:styles` script from the `ui` package.
+## Developer commands
 
-### Utilities
+Run `just` to list all recipes.
 
-This Turborepo has some additional tools already setup for you:
+| Command | What it does |
+| --- | --- |
+| `just install` | Install JS dependencies, fetch Cargo dependencies, install `sqlx-cli` |
+| `just dev` | Start PostgreSQL, then run all apps and services in dev mode |
+| `just build` | Build everything |
+| `just check` | Biome, TypeScript type-check, `cargo check`, and Clippy |
+| `just test` | Run all tests |
+| `just db-up` | Start PostgreSQL only |
+| `just migrate` | Apply pending migrations |
+| `just migrate-add <name>` | Create a new migration in `migrations/` |
+| `just migrate-info` | Show applied and pending migrations |
+| `pnpm format` | Format and fix JS/TS with Biome |
+| `cargo fmt` | Format Rust (run in `services/rust`) |
 
-- [Tailwind CSS](https://tailwindcss.com/) for styles
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [Biome](https://biomejs.dev/) for linting and formatting (`pnpm lint`, `pnpm format`)
+If `cargo` on your `PATH` isn't rustup's (for example a Homebrew Rust install), the pinned toolchain in `rust-toolchain.toml` is ignored.

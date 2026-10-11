@@ -33,7 +33,8 @@ build:
     pnpm exec turbo run build
 
 check:
-    pnpm exec turbo run check lint
+    pnpm exec biome check
+    pnpm exec turbo run check check-types lint
 
 test:
     pnpm exec turbo run test
