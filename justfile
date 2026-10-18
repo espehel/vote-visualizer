@@ -26,6 +26,10 @@ migrate-add name:
 migrate-info: db-up
     sqlx migrate info
 
+# Regenerate packages/api-client from services/rust/openapi.yaml
+api-generate:
+    pnpm --filter @repo/api-client generate
+
 dev: db-up
     pnpm exec turbo run dev
 

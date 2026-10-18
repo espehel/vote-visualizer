@@ -1,0 +1,381 @@
+openapi: "3.1.0"
+info:
+  title: Vote Visualizer API
+  version: "0.1.0"
+  description: >
+    Read API for votes from the Norwegian Storting imported into PostgreSQL, plus a
+    local development endpoint that imports a single vote from Stortinget's open data API.
+
+    Hand-extracted from `services/rust/src/api.rs` and the modules it uses; keep it in sync
+    when routes, DTOs, or `ApiError` change.
+servers:
+  - url: http://127.0.0.1:8080
+    description: Local development (from TcpListener::bind in main.rs)
+# No authentication layer exists; every operation is public.
+security: []
+tags:
+  - name: health
+    description: Service liveness
+  - name: votes
+    description: Imported Storting votes
+  - name: dev
+    description: Local development tooling; not part of the public API
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: getHealth
+      tags: [ health ]
+      responses:
+        "200":
+          description: The service is running.
+          content:
+            text/plain:
+              schema:
+                type: string
+                const: OK
+              example: OK
+  /votes/{id}:
+    get:
+      summary: Get a vote
+      description: >
+        Returns an imported vote with its proposals and every representative's ballot.
+        The vote and its ballots are read in one statement, so they come from the same snapshot.
+      operationId: getVote
+      tags: [ votes ]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Stortinget vote ID (`votering_id`).
+          schema:
+            type: integer
+            format: int64
+          example: 18034
+      responses:
+        "200":
+          description: The vote.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoteDto"
+        "400":
+          $ref: "#/components/responses/InvalidPathParameter"
+        "404":
+          description: No vote with this ID has been imported.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: vote 18034 not found
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /dev/imports/vote:
+    post:
+      summary: Import a vote from Stortinget
+      description: >
+        Local development endpoint. Fetches the case's votes, the vote results, and the vote's
+        proposals from Stortinget, validates them, and commits the vote, its ballots, and the raw
+        source snapshots to PostgreSQL in one transaction. Re-importing a vote replaces it and its
+        complete ballot set. The response is sent after the commit.
+      operationId: postDevImportsVote
+      x-internal: true
+      tags: [ dev ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportVote"
+      responses:
+        "200":
+          description: The vote was imported and committed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportReport"
+        "400":
+          description: The request body is not valid JSON.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Failed to parse the request body as JSON: EOF while parsing an object at line 1 column 1"
+        "404":
+          description: The vote is not part of the given case.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: vote 18034 was not found in case 85196
+        "415":
+          description: "The request is missing a `Content-Type: application/json` header."
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Expected request with `Content-Type: application/json`"
+        "422":
+          description: The JSON body does not match `ImportVote`.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Failed to deserialize the JSON body into the target type: missing field `vote_id` at line 1 column 18"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "502":
+          description: >
+            A request to Stortinget failed (connection error, timeout, or error status), its
+            response could not be decoded, or the source data failed validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: upstream request failed
+components:
+  schemas:
+    VoteDto:
+      type: object
+      required:
+        - id
+        - case_id
+        - voted_at
+        - subject
+        - adopted
+        - individual
+        - for_count
+        - against_count
+        - absent_count
+        - proposals
+        - ballots
+        - imported_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Stortinget vote ID (`votering_id`).
+        case_id:
+          type: integer
+          format: int64
+          description: Stortinget case ID (`sak_id`).
+        voted_at:
+          type: string
+          format: date-time
+          description: When the vote took place (RFC 3339).
+        subject:
+          type: [ string, "null" ]
+          description: The vote's subject, if Stortinget provides one.
+        adopted:
+          type: boolean
+        individual:
+          type: boolean
+          description: Whether representatives' individual ballots were recorded.
+        for_count:
+          type: integer
+          format: int32
+          minimum: 0
+        against_count:
+          type: integer
+          format: int32
+          minimum: 0
+        absent_count:
+          type: integer
+          format: int32
+          minimum: 0
+        proposals:
+          type: array
+          description: >
+            Proposals voted on, as received from Stortinget. Untyped JSON in `VoteDto`; the
+            shape follows `stortinget_models::VoteProposal`, which the importer stores.
+          items:
+            $ref: "#/components/schemas/VoteProposal"
+        ballots:
+          type: array
+          description: One ballot per representative, ordered by `representative_id`.
+          items:
+            $ref: "#/components/schemas/BallotDto"
+        imported_at:
+          type: string
+          format: date-time
+          description: When this vote was last imported (RFC 3339).
+      example:
+        id: 18034
+        case_id: 85196
+        voted_at: "2021-06-01T15:09:53.113+02:00"
+        subject: Forslag nr. 1 fra Senterpartiet
+        adopted: false
+        individual: true
+        for_count: 1
+        against_count: 1
+        absent_count: 1
+        proposals:
+          - forslag_id: 41293
+            forslag_betegnelse: Forslag nr. 1 på vegne av Senterpartiet
+            forslag_betegnelse_kort: Forslag nr. 1
+            forslag_tekst: "<p>Stortinget ber regjeringen ...</p>"
+            forslag_paa_vegne_av_tekst: Senterpartiet
+            forslag_levert_av_representant: null
+            forslag_levert_av_parti_liste:
+              - id: Sp
+                navn: Senterpartiet
+            forslag_sorteringsnummer: 1
+            forslag_type: 1
+        ballots:
+          - representative_id: ABC
+            party_id: Sp
+            choice: for
+          - representative_id: DEF
+            party_id: H
+            choice: against
+          - representative_id: GHI
+            party_id: null
+            choice: absent
+        imported_at: "2026-10-11T13:43:00Z"
+    BallotDto:
+      type: object
+      required: [ representative_id, party_id, choice ]
+      properties:
+        representative_id:
+          type: string
+          description: Stortinget representative ID.
+        party_id:
+          type: [ string, "null" ]
+          description: The representative's party ID, if known.
+        choice:
+          type: string
+          enum: [ for, against, absent ]
+      example:
+        representative_id: ABC
+        party_id: Sp
+        choice: for
+    VoteProposal:
+      type: object
+      description: A proposal as supplied by Stortinget's `voteringsforslag` export.
+      required:
+        - forslag_id
+        - forslag_betegnelse
+        - forslag_betegnelse_kort
+        - forslag_tekst
+        - forslag_paa_vegne_av_tekst
+        - forslag_levert_av_representant
+        - forslag_levert_av_parti_liste
+        - forslag_sorteringsnummer
+        - forslag_type
+      properties:
+        forslag_id:
+          type: integer
+          format: int64
+        forslag_betegnelse:
+          type: [ string, "null" ]
+        forslag_betegnelse_kort:
+          type: [ string, "null" ]
+        forslag_tekst:
+          type: [ string, "null" ]
+          description: Proposal text with HTML preserved as supplied by the source.
+        forslag_paa_vegne_av_tekst:
+          type: [ string, "null" ]
+        forslag_levert_av_representant:
+          type: [ string, "null" ]
+          description: Person ID of the submitting representative.
+        forslag_levert_av_parti_liste:
+          type: [ array, "null" ]
+          items:
+            $ref: "#/components/schemas/Party"
+        forslag_sorteringsnummer:
+          type: integer
+          format: int32
+        forslag_type:
+          type: integer
+          format: int32
+          description: Numeric source code for the proposal type, not yet normalized.
+      example:
+        forslag_id: 41293
+        forslag_betegnelse: Forslag nr. 1 på vegne av Senterpartiet
+        forslag_betegnelse_kort: Forslag nr. 1
+        forslag_tekst: "<p>Stortinget ber regjeringen ...</p>"
+        forslag_paa_vegne_av_tekst: Senterpartiet
+        forslag_levert_av_representant: null
+        forslag_levert_av_parti_liste:
+          - id: Sp
+            navn: Senterpartiet
+        forslag_sorteringsnummer: 1
+        forslag_type: 1
+    Party:
+      type: object
+      required: [ id, navn ]
+      properties:
+        id:
+          type: string
+        navn:
+          type: string
+      example:
+        id: Sp
+        navn: Senterpartiet
+    ImportVote:
+      type: object
+      required: [ case_id, vote_id ]
+      properties:
+        case_id:
+          type: integer
+          format: int64
+          description: Stortinget case ID (`sak_id`).
+        vote_id:
+          type: integer
+          format: int64
+          description: Stortinget vote ID (`votering_id`); must belong to the case.
+      example:
+        case_id: 85196
+        vote_id: 18034
+    ImportReport:
+      type: object
+      required: [ case_id, vote_id, ballot_count, proposal_count ]
+      properties:
+        case_id:
+          type: integer
+          format: int64
+        vote_id:
+          type: integer
+          format: int64
+        ballot_count:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Number of representative vote records saved, including records indicating absence.
+        proposal_count:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Number of proposals associated with this vote and saved.
+      example:
+        case_id: 85196
+        vote_id: 18034
+        ballot_count: 169
+        proposal_count: 3
+    ErrorBody:
+      type: object
+      required: [ error ]
+      properties:
+        error:
+          type: string
+      example:
+        error: internal server error
+  responses:
+    InvalidPathParameter:
+      description: A path parameter could not be parsed.
+      content:
+        text/plain:
+          schema:
+            type: string
+          example: "Invalid URL: Cannot parse `abc` to a `i64`"
+    InternalError:
+      description: A database operation failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+          example:
+            error: internal server error
