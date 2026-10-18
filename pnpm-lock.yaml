@@ -180,6 +180,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@repo/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui

@@ -41,20 +41,44 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/dev/imports/vote": {
+  "/admin/imports/votes": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    /**
+     * List imported votes
+     * @description Admin endpoint. Returns every stored vote's ID, subject, and import time, most recently imported first. Reads only from PostgreSQL; Stortinget is not contacted.
+     */
+    get: operations["getAdminImportsVotes"];
     put?: never;
     /**
      * Import a vote from Stortinget
-     * @description Local development endpoint. Fetches the case's votes, the vote results, and the vote's proposals from Stortinget, validates them, and commits the vote, its ballots, and the raw source snapshots to PostgreSQL in one transaction. Re-importing a vote replaces it and its complete ballot set. The response is sent after the commit.
+     * @description Admin endpoint. Fetches the case's votes, the vote results, and the vote's proposals from Stortinget, validates them, and commits the vote, its ballots, and the raw source snapshots to PostgreSQL in one transaction. Re-importing a vote replaces it and its complete ballot set. The response is sent after the commit.
      */
-    post: operations["postDevImportsVote"];
+    post: operations["postAdminImportsVotes"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/imports/votes/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get an imported vote's source data
+     * @description Admin endpoint. Returns the stored vote's subject and import time together with the raw Stortinget responses it was imported from. Reads only from PostgreSQL; Stortinget is not contacted. The vote and its snapshots are read in one statement.
+     */
+    get: operations["getAdminImportsVote"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -257,6 +281,110 @@ export interface components {
       proposal_count: number;
     };
     /**
+     * @description A stored vote together with the raw source responses it was imported from.
+     * @example {
+     *       "vote_id": 18034,
+     *       "case_id": 85196,
+     *       "subject": "Forslag nr. 1 fra Senterpartiet",
+     *       "imported_at": "2026-10-11T13:43:00Z",
+     *       "case_votes": {
+     *         "sak_id": 85196,
+     *         "sak_votering_liste": [
+     *           {
+     *             "sak_id": 85196,
+     *             "votering_id": 18034,
+     *             "votering_tema": "Forslag nr. 1 fra Senterpartiet",
+     *             "vedtatt": false,
+     *             "personlig_votering": true,
+     *             "antall_for": 1,
+     *             "antall_mot": 1,
+     *             "antall_ikke_tilstede": 1
+     *           }
+     *         ]
+     *       },
+     *       "results": {
+     *         "votering_id": 18034,
+     *         "voteringsresultat_liste": [
+     *           {
+     *             "representant": {
+     *               "id": "ABC",
+     *               "fornavn": "Kari",
+     *               "etternavn": "Nordmann",
+     *               "parti": {
+     *                 "id": "Sp",
+     *                 "navn": "Senterpartiet"
+     *               }
+     *             },
+     *             "votering": 2
+     *           }
+     *         ]
+     *       },
+     *       "proposals": {
+     *         "votering_id": 18034,
+     *         "voteringsforslag_liste": [
+     *           {
+     *             "forslag_id": 41293,
+     *             "forslag_betegnelse": "Forslag nr. 1 på vegne av Senterpartiet",
+     *             "forslag_type": 1
+     *           }
+     *         ]
+     *       }
+     *     }
+     */
+    ImportedVote: {
+      /**
+       * Format: int64
+       * @description Stortinget vote ID (`votering_id`).
+       */
+      vote_id: number;
+      /**
+       * Format: int64
+       * @description Stortinget case ID (`sak_id`).
+       */
+      case_id: number;
+      /** @description The vote's subject, if Stortinget provides one. */
+      subject: string | null;
+      /**
+       * Format: date-time
+       * @description When this vote was last imported (RFC 3339).
+       */
+      imported_at: string;
+      /** @description Raw `voteringer` response for the case, as Stortinget sent it, including every vote in the case. `null` if the snapshot is missing. */
+      case_votes: {
+        [key: string]: unknown;
+      } | null;
+      /** @description Raw `voteringsresultat` response for the vote, as Stortinget sent it. `null` if the snapshot is missing. */
+      results: {
+        [key: string]: unknown;
+      } | null;
+      /** @description Raw `voteringsforslag` response for the vote, as Stortinget sent it. `null` if the snapshot is missing. */
+      proposals: {
+        [key: string]: unknown;
+      } | null;
+    };
+    /**
+     * @description A stored vote as listed in the admin overview.
+     * @example {
+     *       "id": 18034,
+     *       "subject": "Forslag nr. 1 fra Senterpartiet",
+     *       "imported_at": "2026-10-11T13:43:00Z"
+     *     }
+     */
+    ImportedVoteSummary: {
+      /**
+       * Format: int64
+       * @description Stortinget vote ID (`votering_id`).
+       */
+      id: number;
+      /** @description The vote's subject, if Stortinget provides one. */
+      subject: string | null;
+      /**
+       * Format: date-time
+       * @description When this vote was last imported (RFC 3339).
+       */
+      imported_at: string;
+    };
+    /**
      * @example {
      *       "error": "internal server error"
      *     }
@@ -302,6 +430,8 @@ export type VoteProposal = components["schemas"]["VoteProposal"];
 export type Party = components["schemas"]["Party"];
 export type ImportVote = components["schemas"]["ImportVote"];
 export type ImportReport = components["schemas"]["ImportReport"];
+export type ImportedVote = components["schemas"]["ImportedVote"];
+export type ImportedVoteSummary = components["schemas"]["ImportedVoteSummary"];
 export type ErrorBody = components["schemas"]["ErrorBody"];
 export type ResponseInvalidPathParameter =
   components["responses"]["InvalidPathParameter"];
@@ -371,7 +501,28 @@ export interface operations {
       500: components["responses"]["InternalError"];
     };
   };
-  postDevImportsVote: {
+  getAdminImportsVotes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description All imported votes. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ImportedVoteSummary"][];
+        };
+      };
+      500: components["responses"]["InternalError"];
+    };
+  };
+  postAdminImportsVotes: {
     parameters: {
       query?: never;
       header?: never;
@@ -452,6 +603,48 @@ export interface operations {
           "application/json": components["schemas"]["ErrorBody"];
         };
       };
+    };
+  };
+  getAdminImportsVote: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /**
+         * @description Stortinget vote ID (`votering_id`).
+         * @example 18034
+         */
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The imported vote and its source snapshots. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ImportedVote"];
+        };
+      };
+      400: components["responses"]["InvalidPathParameter"];
+      /** @description No vote with this ID has been imported. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "error": "vote 18034 not found"
+           *     }
+           */
+          "application/json": components["schemas"]["ErrorBody"];
+        };
+      };
+      500: components["responses"]["InternalError"];
     };
   };
 }

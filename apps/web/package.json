@@ -9,6 +9,7 @@
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@repo/api-client": "workspace:*",
     "@repo/ui": "workspace:*",
     "next": "16.4.0",
     "react": "19.3.0",

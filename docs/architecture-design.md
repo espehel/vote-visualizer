@@ -68,7 +68,7 @@ apps/
   web/                         Next.js application
 packages/
   typescript-config/           Shared tsconfig files (base, nextjs, react-library)
-  ui/                          Shared React components and Tailwind CSS + daisyUI setup
+  ui/                          Shared Tailwind CSS + daisyUI setup
 services/
   rust/
     Cargo.toml                 Single package (crate name `rust`)

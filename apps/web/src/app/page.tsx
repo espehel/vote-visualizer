@@ -1,69 +1,79 @@
 import Image from "next/image";
+import Link from "next/link";
+import icon from "./icon.png";
+
+const STORTINGET_DATA_URL = "https://data.stortinget.no/";
 
 export default function Home() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex w-full max-w-3xl flex-1 flex-col items-center justify-between bg-white px-16 py-32 sm:items-start dark:bg-black">
-        <Image
-          className="h-5 w-[100px] dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs font-semibold text-3xl text-black leading-10 tracking-tight dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg text-zinc-600 leading-8 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 font-medium text-base sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-base-content px-5 text-base-100 transition-colors hover:bg-[#383838] md:w-[158px] dark:hover:bg-[#ccc]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <>
+      <header className="navbar border-base-300 border-b px-4 sm:px-8">
+        <div className="navbar-start">
+          <Link
+            href="/"
+            className="flex items-center gap-2 font-semibold text-lg tracking-tight"
           >
-            <Image
-              className="h-[14px] w-4 dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
+            <Image src={icon} alt="" width={28} height={28} priority />
+            Vote Visualizer
+          </Link>
+        </div>
+        <nav className="navbar-end gap-2">
+          <a href="#how-it-works" className="btn btn-ghost btn-sm">
+            How it works
           </a>
           <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-black/[.08] border-solid px-5 transition-colors hover:border-transparent hover:bg-black/[.04] md:w-[158px] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            href={STORTINGET_DATA_URL}
             target="_blank"
             rel="noopener noreferrer"
+            className="btn btn-ghost btn-sm"
           >
-            Documentation
+            Open data
           </a>
-        </div>
+        </nav>
+      </header>
+
+      <main className="flex flex-1 flex-col">
+        <section className="hero flex-1 py-20 sm:py-32">
+          <div className="hero-content max-w-3xl text-center">
+            <div>
+              <h1 className="font-bold text-4xl tracking-tight sm:text-6xl">
+                See how the Storting really votes
+              </h1>
+              <p className="mx-auto mt-6 max-w-xl text-base-content/70 text-lg leading-8">
+                Follow every vote in the Norwegian parliament. Compare parties,
+                track representatives, and see where they stand, straight from
+                Stortinget&apos;s open data.
+              </p>
+              <a href="#how-it-works" className="btn btn-primary mt-10">
+                How it works
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section id="how-it-works" className="bg-base-200 px-4 py-16 sm:px-8">
+          <div className="mx-auto grid max-w-5xl gap-10 sm:grid-cols-3">
+            <div>
+              <h2 className="font-semibold text-lg">Every vote</h2>
+              <p className="mt-2 text-base-content/70">
+                Votes are imported directly from Stortinget and kept up to date.
+              </p>
+            </div>
+            <div>
+              <h2 className="font-semibold text-lg">Party lines</h2>
+              <p className="mt-2 text-base-content/70">
+                See how each party voted and who broke ranks.
+              </p>
+            </div>
+            <div>
+              <h2 className="font-semibold text-lg">Your representatives</h2>
+              <p className="mt-2 text-base-content/70">
+                Look up a representative and follow their voting record.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
-    </div>
+    </>
   );
 }

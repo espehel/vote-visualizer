@@ -1,12 +1,8 @@
 /* Shared Tailwind + daisyUI setup. Apps import this via `@repo/ui/styles.css`. */
 @import "tailwindcss";
-@plugin "daisyui";
-
-/* Scan the UI components so their classes are generated in consuming apps */
-@source "./";
-
-@theme {
-  --color-blue-1000: #2a8af6;
-  --color-purple-1000: #a853ba;
-  --color-red-1000: #e92a67;
+@plugin "daisyui" {
+  themes: autumn --default;
 }
+
+/* Apps reach this package through node_modules, which Tailwind does not scan. */
+@source "./**/*.tsx";

@@ -3,8 +3,9 @@ info:
   title: Vote Visualizer API
   version: "0.1.0"
   description: >
-    Read API for votes from the Norwegian Storting imported into PostgreSQL, plus a
-    local development endpoint that imports a single vote from Stortinget's open data API.
+    Read API for votes from the Norwegian Storting imported into PostgreSQL, plus admin
+    endpoints that import a single vote from Stortinget's open data API and inspect what
+    was imported.
 
     Hand-extracted from `services/rust/src/api.rs` and the modules it uses; keep it in sync
     when routes, DTOs, or `ApiError` change.
@@ -18,8 +19,8 @@ tags:
     description: Service liveness
   - name: votes
     description: Imported Storting votes
-  - name: dev
-    description: Local development tooling; not part of the public API
+  - name: admin
+    description: Import administration; not part of the public API
 paths:
   /health:
     get:
@@ -71,17 +72,36 @@ paths:
                 error: vote 18034 not found
         "500":
           $ref: "#/components/responses/InternalError"
-  /dev/imports/vote:
+  /admin/imports/votes:
+    get:
+      summary: List imported votes
+      description: >
+        Admin endpoint. Returns every stored vote's ID, subject, and import time, most recently
+        imported first. Reads only from PostgreSQL; Stortinget is not contacted.
+      operationId: getAdminImportsVotes
+      x-internal: true
+      tags: [ admin ]
+      responses:
+        "200":
+          description: All imported votes.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ImportedVoteSummary"
+        "500":
+          $ref: "#/components/responses/InternalError"
     post:
       summary: Import a vote from Stortinget
       description: >
-        Local development endpoint. Fetches the case's votes, the vote results, and the vote's
+        Admin endpoint. Fetches the case's votes, the vote results, and the vote's
         proposals from Stortinget, validates them, and commits the vote, its ballots, and the raw
         source snapshots to PostgreSQL in one transaction. Re-importing a vote replaces it and its
         complete ballot set. The response is sent after the commit.
-      operationId: postDevImportsVote
+      operationId: postAdminImportsVotes
       x-internal: true
-      tags: [ dev ]
+      tags: [ admin ]
       requestBody:
         required: true
         content:
@@ -136,6 +156,44 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
               example:
                 error: upstream request failed
+  /admin/imports/votes/{id}:
+    get:
+      summary: Get an imported vote's source data
+      description: >
+        Admin endpoint. Returns the stored vote's subject and import time together with the
+        raw Stortinget responses it was imported from. Reads only from PostgreSQL; Stortinget
+        is not contacted. The vote and its snapshots are read in one statement.
+      operationId: getAdminImportsVote
+      x-internal: true
+      tags: [ admin ]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Stortinget vote ID (`votering_id`).
+          schema:
+            type: integer
+            format: int64
+          example: 18034
+      responses:
+        "200":
+          description: The imported vote and its source snapshots.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportedVote"
+        "400":
+          $ref: "#/components/responses/InvalidPathParameter"
+        "404":
+          description: No vote with this ID has been imported.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: vote 18034 not found
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   schemas:
     VoteDto:
@@ -355,6 +413,104 @@ components:
         vote_id: 18034
         ballot_count: 169
         proposal_count: 3
+    ImportedVote:
+      type: object
+      description: A stored vote together with the raw source responses it was imported from.
+      required:
+        - vote_id
+        - case_id
+        - subject
+        - imported_at
+        - case_votes
+        - results
+        - proposals
+      properties:
+        vote_id:
+          type: integer
+          format: int64
+          description: Stortinget vote ID (`votering_id`).
+        case_id:
+          type: integer
+          format: int64
+          description: Stortinget case ID (`sak_id`).
+        subject:
+          type: [ string, "null" ]
+          description: The vote's subject, if Stortinget provides one.
+        imported_at:
+          type: string
+          format: date-time
+          description: When this vote was last imported (RFC 3339).
+        case_votes:
+          type: [ object, "null" ]
+          additionalProperties: true
+          description: >
+            Raw `voteringer` response for the case, as Stortinget sent it, including every vote
+            in the case. `null` if the snapshot is missing.
+        results:
+          type: [ object, "null" ]
+          additionalProperties: true
+          description: >
+            Raw `voteringsresultat` response for the vote, as Stortinget sent it. `null` if the
+            snapshot is missing.
+        proposals:
+          type: [ object, "null" ]
+          additionalProperties: true
+          description: >
+            Raw `voteringsforslag` response for the vote, as Stortinget sent it. `null` if the
+            snapshot is missing.
+      example:
+        vote_id: 18034
+        case_id: 85196
+        subject: Forslag nr. 1 fra Senterpartiet
+        imported_at: "2026-10-11T13:43:00Z"
+        case_votes:
+          sak_id: 85196
+          sak_votering_liste:
+            - sak_id: 85196
+              votering_id: 18034
+              votering_tema: Forslag nr. 1 fra Senterpartiet
+              vedtatt: false
+              personlig_votering: true
+              antall_for: 1
+              antall_mot: 1
+              antall_ikke_tilstede: 1
+        results:
+          votering_id: 18034
+          voteringsresultat_liste:
+            - representant:
+                id: ABC
+                fornavn: Kari
+                etternavn: Nordmann
+                parti:
+                  id: Sp
+                  navn: Senterpartiet
+              votering: 2
+        proposals:
+          votering_id: 18034
+          voteringsforslag_liste:
+            - forslag_id: 41293
+              forslag_betegnelse: Forslag nr. 1 på vegne av Senterpartiet
+              forslag_type: 1
+    ImportedVoteSummary:
+      type: object
+      description: A stored vote as listed in the admin overview.
+      required: [ id, subject, imported_at ]
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Stortinget vote ID (`votering_id`).
+        subject:
+          type: [ string, "null" ]
+          description: The vote's subject, if Stortinget provides one.
+        imported_at:
+          type: string
+          format: date-time
+          description: When this vote was last imported (RFC 3339).
+      example:
+        id: 18034
+        subject: Forslag nr. 1 fra Senterpartiet
+        imported_at: "2026-10-11T13:43:00Z"
     ErrorBody:
       type: object
       required: [ error ]
