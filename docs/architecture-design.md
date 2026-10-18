@@ -67,9 +67,8 @@ The repository is a pnpm/Turborepo monorepo with one Rust package. The current l
 apps/
   web/                         Next.js application
 packages/
-  tailwind-config/             Shared Tailwind CSS theme and PostCSS configuration
   typescript-config/           Shared tsconfig files (base, nextjs, react-library)
-  ui/                          Shared React component library
+  ui/                          Shared React components and Tailwind CSS + daisyUI setup
 services/
   rust/
     Cargo.toml                 Single package (crate name `rust`)

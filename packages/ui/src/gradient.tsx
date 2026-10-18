@@ -9,11 +9,11 @@ export function Gradient({
 }) {
   return (
     <span
-      className={`ui:absolute ui:rounded-[100%] ui:mix-blend-normal ui:will-change-[filter] ${
-        small ? "ui:blur-[32px]" : "ui:blur-[75px]"
+      className={`absolute rounded-[100%] mix-blend-normal will-change-[filter] ${
+        small ? "blur-[32px]" : "blur-[75px]"
       } ${
         conic
-          ? "ui:bg-gradient-to-r ui:bg-red-1000 ui:from-10% ui:via-30% ui:via-purple-1000 ui:to-100% ui:to-blue-1000"
+          ? "bg-gradient-to-r bg-red-1000 from-10% via-30% via-purple-1000 to-100% to-blue-1000"
           : ""
       } ${className ?? ""}`}
     />

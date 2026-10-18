@@ -40,7 +40,7 @@ export default function Home() {
         </div>
         <div className="flex flex-col gap-4 font-medium text-base sm:flex-row">
           <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] md:w-[158px] dark:hover:bg-[#ccc]"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-base-content px-5 text-base-100 transition-colors hover:bg-[#383838] md:w-[158px] dark:hover:bg-[#ccc]"
             href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
             target="_blank"
             rel="noopener noreferrer"
